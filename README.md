@@ -11,8 +11,7 @@ This is the FastAPI backend for the **Integrated Water Information System (IWIS)
 ## Setup Instructions
 
 ### 1. Clone and Enter
-git clone https://github.com/LiefsEmma/iwis-backend.git
-cd iwis-backend
+git clone repositorie
 
 ### 2. Virtual Environment
 python3 -m venv venv
