@@ -6,22 +6,33 @@ This is the FastAPI backend for the **Integrated Water Information System (IWIS)
 - **Framework:** FastAPI (Python)
 - **Database:** PostgreSQL
 - **ORM:** SQLAlchemy
-- **Data Analysis:** Pandas / Scikit-learn (Sprint 3)
+- **Data Analysis:** Pandas, Numpy, Seaborn, Plotly
 
 ## Setup Instructions
 
 ### 1. Clone and Enter
-git clone repositorie
+```bash
+git clone https://https://github.com/LiefsEmma/iwis-backend.git
+cd iwis-backend
+```
 
 ### 2. Virtual Environment
+
+```bash
 python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate # On windows, run .\venv\Scripts\activate
+```
+
 
 ### 3. Install Dependencies
+```bash
 pip install -r requirements.txt
+```
 
 ### 4. Run the Server
+```
 fastapi dev app/main.py
+```
 
 The API will be available at http://127.0.0.1:8000.
 
