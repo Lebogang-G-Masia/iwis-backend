@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 from . import models, schemas
 from .database import Base, engine, get_db
 
+import pandas as pd
+
 
 app = FastAPI(title="IWIS Backend")
 
@@ -302,3 +304,35 @@ def citizen_reports_geojson(db: Session = Depends(get_db)) -> Dict[str, Any]:
     ]
 
     return {"type": "FeatureCollection", "features": features}
+
+@app.get("/analysis/correlations")
+def get_realtime_correlations(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    # 1. Fetch the latest 500 water readings
+    readings = db.query(models.WaterReading).order_by(models.WaterReading.recorded_at.desc()).limit(500).all()
+    
+    if not readings:
+        raise HTTPException(status_code=404, detail="Not enough data for analysis")
+
+    # 2. Convert to a Pandas DataFrame
+    data = [{
+        "ph": r.ph,
+        "temperature_c": r.temperature_c,
+        "nitrates_mg_l": r.nitrates_mg_l,
+        "dissolved_oxygen": r.dissolved_oxygen_mg_l,
+        "turbidity": r.turbidity_ntu
+    } for r in readings]
+    
+    df = pd.DataFrame(data)
+
+    # 3. Calculate the Correlation Matrix using Pandas
+    # This returns values from -1.0 (strong inverse) to 1.0 (strong positive)
+    corr_matrix = df.corr(method="pearson").fillna(0).round(3).to_dict()
+
+    # 4. Generate some basic descriptive statistics (min, max, mean)
+    stats = df.describe().round(2).to_dict()
+
+    return {
+        "correlations": corr_matrix,
+        "statistics": stats,
+        "sample_size": len(df)
+    }
