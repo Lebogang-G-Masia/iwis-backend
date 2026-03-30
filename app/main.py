@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 from . import models, schemas
 from .database import Base, engine, get_db
 
+import pandas as pd
+
 
 app = FastAPI(title="IWIS Backend")
 
@@ -110,6 +112,16 @@ def create_water_reading(
     db.add(water_reading)
     db.commit()
     db.refresh(water_reading)
+
+    NITRATE_THRESHOLD = 5.0
+    if water_reading.nitrates_mg_l > NITRATE_THRESHOLD:
+        new_alert = models.Alert(
+                reading_id=water_reading.id,
+                alert_type="HIGH NITRATE DETECTED",
+                threshold_val=NITRATE_THRESHOLD
+                )
+        db.add(new_alert)
+        db.commit()
 
     return schemas.WaterReadingRead(
         id=water_reading.id,
@@ -302,3 +314,35 @@ def citizen_reports_geojson(db: Session = Depends(get_db)) -> Dict[str, Any]:
     ]
 
     return {"type": "FeatureCollection", "features": features}
+
+@app.get("/analysis/correlations")
+def get_realtime_correlations(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    readings = db.query(models.WaterReading).order_by(models.WaterReading.recorded_at.desc()).limit(500).all()
+    
+    if not readings:
+        raise HTTPException(status_code=404, detail="Not enough data for analysis")
+
+    data = [{
+        "ph": r.ph,
+        "temperature_c": r.temperature_c,
+        "nitrates_mg_l": r.nitrates_mg_l,
+        "dissolved_oxygen": r.dissolved_oxygen_mg_l,
+        "turbidity": r.turbidity_ntu
+    } for r in readings]
+    
+    df = pd.DataFrame(data)
+
+    corr_matrix = df.corr(method="pearson").fillna(0).round(3).to_dict()
+
+    stats = df.describe().round(2).to_dict()
+
+    return {
+        "correlations": corr_matrix,
+        "statistics": stats,
+        "sample_size": len(df)
+    }
+
+@app.get("/alerts", response_model=List[schemas.AlertRead])
+def list_alerts(db: Session = Depends(get_db)) -> List[schemas.AlertRead]:
+    alerts = db.query(models.Alert).filter(models.Alert.resolved == False).order_by(models.Alert.created_at.desc()).limit(5).all()
+    return alerts
