@@ -18,37 +18,76 @@ This is the FastAPI backend for the Integrated Water Information System (IWIS), 
 
 **1. Database Setup**
 Ensure PostgreSQL is running and create the `iwis` database:
-```bash
-# Linux (example)
-sudo -u postgres createdb iwis
-```
+
+- **Windows (PowerShell):**
+  ```powershell
+  createdb -U postgres iwis
+  ```
+- **macOS (Homebrew):**
+  ```bash
+  createdb iwis
+  ```
+- **Linux:**
+  ```bash
+  sudo -u postgres createdb iwis
+  ```
 
 **2. Configure Environment**
-Create a `.env` file in the `iwis-backend` directory:
+Copy the example environment file and update your credentials:
+
+- **macOS / Linux:**
+  ```bash
+  cp .env.example .env
+  ```
+- **Windows (PowerShell):**
+  ```powershell
+  copy .env.example .env
+  ```
+
+Update `.env` with your database URL (using `127.0.0.1` is recommended):
 ```env
-DATABASE_URL=postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/iwis
+DATABASE_URL=postgresql+psycopg2://postgres:YOUR_PASSWORD@127.0.0.1:5432/iwis
 ```
-*Note: Using `127.0.0.1` is recommended over `localhost` for faster and more reliable connections.*
 
 **3. Install Dependencies**
-The project uses a shared virtual environment in the root directory. From the project root:
-```bash
-./venv/bin/pip install -r iwis-backend/requirements.txt
-./venv/bin/pip install websockets
-```
+The project uses a shared virtual environment (`venv`) located in the root directory.
+
+- **macOS / Linux:**
+  ```bash
+  ./venv/bin/pip install -r iwis-backend/requirements.txt
+  ./venv/bin/pip install websockets
+  ```
+- **Windows (PowerShell):**
+  ```powershell
+  .\venv\Scripts\pip install -r iwis-backend\requirements.txt
+  .\venv\Scripts\pip install websockets
+  ```
 
 **4. Start the FastAPI Server**
 From the `iwis-backend` directory:
-```bash
-../venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
-```
+
+- **macOS / Linux:**
+  ```bash
+  ../venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+  ```
+- **Windows (PowerShell):**
+  ```powershell
+  ..\venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+  ```
+
 The server will be available at `http://127.0.0.1:8000`.
 
 **5. Seed Historical Data (Optional)**
 Populate the database with realistic trend data for testing:
-```bash
-../venv/bin/python seed_data.py
-```
+
+- **macOS / Linux:**
+  ```bash
+  ../venv/bin/python seed_data.py
+  ```
+- **Windows (PowerShell):**
+  ```powershell
+  ..\venv\Scripts\python seed_data.py
+  ```
 
 ## API Documentation
 Once the server is running, you can explore the API using:
