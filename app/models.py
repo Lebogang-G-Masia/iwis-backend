@@ -27,6 +27,7 @@ class WaterReading(Base):
     ph = Column(Float, nullable=False)
     temperature_c = Column(Float, nullable=False)
     nitrates_mg_l = Column(Float, nullable=False)
+    phosphate_mg_l = Column(Float, nullable=True)
     turbidity_ntu = Column(Float, nullable=False)
     dissolved_oxygen_mg_l = Column(Float, nullable=False)
     latitude = Column(Float, nullable=False)
@@ -53,6 +54,7 @@ class CitizenReport(Base):
     id = Column(Integer, primary_key=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), index=True)
     reporter_name = Column(String(120), nullable=True)
+    report_type = Column(String(50), nullable=True, default="citizen-scientist")
     description = Column(Text, nullable=True)
     photo_url = Column(String(500), nullable=True)
     status = Column(String(30), nullable=False, default="new", index=True)
@@ -70,6 +72,7 @@ class Alert(Base):
     id = Column(Integer, primary_key=True, index=True) # Using Integer to keep it simple, or UUID if you configured it that way
     reading_id = Column(Integer, ForeignKey("water_readings.id", ondelete="CASCADE"))
     alert_type = Column(String(150), nullable=False)
+    severity = Column(String(20), nullable=False, default="medium")
     threshold_val = Column(Float)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     resolved = Column(Boolean, default=False)

@@ -1,15 +1,18 @@
 from typing import Any, Dict, List, Optional
 import json
 import asyncio
+from datetime import datetime
 
 from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from . import models, schemas
 from .database import Base, engine, get_db
 
 import pandas as pd
+import numpy as np
 
 
 app = FastAPI(title="IWIS Backend")
@@ -50,6 +53,26 @@ def _feature(feature_id: int, latitude: float, longitude: float, properties: Dic
         "geometry": {"type": "Point", "coordinates": [longitude, latitude]},
         "properties": properties,
     }
+
+def calculate_wqi(reading: models.WaterReading) -> float:
+    # Simplified Water Quality Index (0-100)
+    # Weights: pH (0.2), Nitrate (0.3), DO (0.3), Turbidity (0.2)
+    # Ideal: pH 7.0, Nitrate < 1.0, DO > 7.0, Turbidity < 5.0
+    
+    # pH score: 100 if 7.0, decreases as it moves away
+    ph_score = 100 - abs(reading.ph - 7.0) * 20
+    
+    # Nitrate score: 100 if < 1.0, 0 if > 10.0
+    nitrate_score = max(0, 100 - reading.nitrates_mg_l * 10)
+    
+    # DO score: 100 if > 7.0, 0 if < 2.0
+    do_score = min(100, max(0, (reading.dissolved_oxygen_mg_l - 2.0) * 20))
+    
+    # Turbidity score: 100 if < 5.0, 0 if > 50.0
+    turb_score = max(0, 100 - (reading.turbidity_ntu - 5.0) * 2)
+    
+    wqi = (ph_score * 0.2) + (nitrate_score * 0.3) + (do_score * 0.3) + (turb_score * 0.2)
+    return round(max(0, min(100, wqi)), 2)
 
 
 @app.on_event("startup")
@@ -136,6 +159,7 @@ def create_water_reading(
         ph=payload.ph,
         temperature_c=payload.temperature_c,
         nitrates_mg_l=payload.nitrates_mg_l,
+        phosphate_mg_l=payload.phosphate_mg_l,
         turbidity_ntu=payload.turbidity_ntu,
         dissolved_oxygen_mg_l=payload.dissolved_oxygen_mg_l,
         latitude=payload.latitude,
@@ -158,9 +182,11 @@ def create_water_reading(
 
     NITRATE_THRESHOLD = 5.0
     if water_reading.nitrates_mg_l > NITRATE_THRESHOLD:
+        severity = "high" if water_reading.nitrates_mg_l > 10.0 else "medium"
         new_alert = models.Alert(
                 reading_id=water_reading.id,
                 alert_type="HIGH NITRATE DETECTED",
+                severity=severity,
                 threshold_val=NITRATE_THRESHOLD
                 )
         db.add(new_alert)
@@ -181,12 +207,18 @@ def create_water_reading(
 @app.get("/water-readings", response_model=List[schemas.WaterReadingRead])
 def list_water_readings(
     sensor_id: Optional[int] = None,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
     limit: int = Query(default=200, ge=1, le=1000),
     db: Session = Depends(get_db),
 ) -> List[schemas.WaterReadingRead]:
     query = db.query(models.WaterReading)
     if sensor_id is not None:
         query = query.filter(models.WaterReading.sensor_id == sensor_id)
+    if start_date:
+        query = query.filter(models.WaterReading.recorded_at >= start_date)
+    if end_date:
+        query = query.filter(models.WaterReading.recorded_at <= end_date)
 
     readings = query.order_by(models.WaterReading.recorded_at.desc()).limit(limit).all()
 
@@ -198,6 +230,7 @@ def list_water_readings(
             ph=reading.ph,
             temperature_c=reading.temperature_c,
             nitrates_mg_l=reading.nitrates_mg_l,
+            phosphate_mg_l=reading.phosphate_mg_l,
             turbidity_ntu=reading.turbidity_ntu,
             dissolved_oxygen_mg_l=reading.dissolved_oxygen_mg_l,
             latitude=reading.latitude,
@@ -267,6 +300,7 @@ def create_citizen_report(
         description=payload.description,
         photo_url=payload.photo_url,
         reporter_name=payload.reporter_name,
+        report_type=payload.report_type,
         latitude=payload.latitude,
         longitude=payload.longitude,
     )
@@ -280,6 +314,7 @@ def create_citizen_report(
         description=report.description,
         photo_url=report.photo_url,
         reporter_name=report.reporter_name,
+        report_type=report.report_type,
         status=report.status,
         latitude=report.latitude,
         longitude=report.longitude,
@@ -305,6 +340,7 @@ def list_citizen_reports(
             description=report.description,
             photo_url=report.photo_url,
             reporter_name=report.reporter_name,
+            report_type=report.report_type,
             status=report.status,
             latitude=report.latitude,
             longitude=report.longitude,
@@ -317,20 +353,34 @@ def list_citizen_reports(
 def sensors_geojson(db: Session = Depends(get_db)) -> Dict[str, Any]:
     sensors = db.query(models.Sensor).all()
 
-    features = [
-        _feature(
+    features = []
+    for sensor in sensors:
+        latest_reading = db.query(models.WaterReading).filter(models.WaterReading.sensor_id == sensor.id).order_by(models.WaterReading.recorded_at.desc()).first()
+        
+        properties = {
+            "name": sensor.name,
+            "sensor_type": sensor.sensor_type,
+            "is_active": sensor.is_active,
+            "installed_at": sensor.installed_at.isoformat() if sensor.installed_at else None,
+        }
+        
+        if latest_reading:
+            properties["latest_readings"] = {
+                "ph": latest_reading.ph,
+                "nitrate": latest_reading.nitrates_mg_l,
+                "phosphate": latest_reading.phosphate_mg_l,
+                "temperature": latest_reading.temperature_c,
+                "dissolvedOxygen": latest_reading.dissolved_oxygen_mg_l,
+                "turbidity": latest_reading.turbidity_ntu,
+                "recorded_at": latest_reading.recorded_at.isoformat()
+            }
+        
+        features.append(_feature(
             feature_id=sensor.id,
             latitude=sensor.latitude,
             longitude=sensor.longitude,
-            properties={
-                "name": sensor.name,
-                "sensor_type": sensor.sensor_type,
-                "is_active": sensor.is_active,
-                "installed_at": sensor.installed_at.isoformat() if sensor.installed_at else None,
-            },
-        )
-        for sensor in sensors
-    ]
+            properties=properties,
+        ))
 
     return {"type": "FeatureCollection", "features": features}
 
@@ -348,6 +398,8 @@ def citizen_reports_geojson(db: Session = Depends(get_db)) -> Dict[str, Any]:
                 "status": report.status,
                 "description": report.description,
                 "photo_url": report.photo_url,
+                "reporter_name": report.reporter_name,
+                "report_type": report.report_type,
                 "created_at": report.created_at.isoformat() if report.created_at else None,
             },
         )
@@ -378,6 +430,7 @@ def get_realtime_correlations(
         "ph": r.ph,
         "temperature_c": r.temperature_c,
         "nitrates_mg_l": r.nitrates_mg_l,
+        "phosphate_mg_l": r.phosphate_mg_l if r.phosphate_mg_l is not None else 0,
         "dissolved_oxygen": r.dissolved_oxygen_mg_l,
         "turbidity": r.turbidity_ntu
     } for r in readings]
@@ -394,9 +447,58 @@ def get_realtime_correlations(
         "sample_size": len(df)
     }
 
+@app.get("/analysis/hotspots")
+def get_pollution_hotspots(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
+    # Simple algorithm: Find locations with nitrate > 5.0 or phosphate > 2.0
+    high_pollution_readings = db.query(models.WaterReading).filter(
+        (models.WaterReading.nitrates_mg_l > 4.0) | (models.WaterReading.phosphate_mg_l > 1.5)
+    ).order_by(models.WaterReading.recorded_at.desc()).limit(100).all()
+    
+    if not high_pollution_readings:
+        return []
+    
+    hotspots = []
+    for r in high_pollution_readings:
+        intensity = "low"
+        if r.nitrates_mg_l > 8.0 or (r.phosphate_mg_l and r.phosphate_mg_l > 3.0):
+            intensity = "high"
+        elif r.nitrates_mg_l > 5.0 or (r.phosphate_mg_l and r.phosphate_mg_l > 2.0):
+            intensity = "medium"
+            
+        hotspots.append({
+            "id": f"hotspot-{r.id}",
+            "lat": r.latitude,
+            "lng": r.longitude,
+            "intensity": intensity,
+            "radiusMeters": 400 + (r.nitrates_mg_l * 20)
+        })
+        
+    return hotspots
+
+@app.get("/analysis/wqi-summary")
+def get_wqi_summary(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    latest_readings = db.query(models.WaterReading).order_by(models.WaterReading.recorded_at.desc()).limit(50).all()
+    
+    if not latest_readings:
+        return {"current_wqi": 0, "status": "No data"}
+        
+    wqi_values = [calculate_wqi(r) for r in latest_readings]
+    avg_wqi = sum(wqi_values) / len(wqi_values)
+    
+    status = "Excellent"
+    if avg_wqi < 50: status = "Poor"
+    elif avg_wqi < 70: status = "Fair"
+    elif avg_wqi < 90: status = "Good"
+    
+    return {
+        "current_wqi": round(avg_wqi, 1),
+        "status": status,
+        "sample_size": len(latest_readings)
+    }
+
 @app.get("/alerts", response_model=List[schemas.AlertRead])
 def list_alerts(db: Session = Depends(get_db)) -> List[schemas.AlertRead]:
-    alerts = db.query(models.Alert).filter(models.Alert.resolved == False).order_by(models.Alert.created_at.desc()).limit(5).all()
+    alerts = db.query(models.Alert).filter(models.Alert.resolved == False).order_by(models.Alert.created_at.desc()).limit(10).all()
     return alerts
 
 @app.put("/alerts/{alert_id}/status", response_model=schemas.AlertRead)
