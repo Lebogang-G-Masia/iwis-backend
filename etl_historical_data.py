@@ -38,6 +38,7 @@ def run_etl():
                 # Extract values with safe defaults
                 ph = row['pH_Diss_Water'] if 'pH_Diss_Water' in df.columns else 7.0
                 nitrates = row['NO3_NO2_N_Diss_Water'] if 'NO3_NO2_N_Diss_Water' in df.columns else 1.0
+                phosphate = row['PO4_P_Diss_Water'] if 'PO4_P_Diss_Water' in df.columns else 0.5
                 
                 reading = models.WaterReading(
                     sensor_id=1, # Assuming sensor 1 exists
@@ -45,6 +46,7 @@ def run_etl():
                     ph=float(ph) if pd.notna(ph) else 7.0,
                     temperature_c=22.0,
                     nitrates_mg_l=float(nitrates) if pd.notna(nitrates) else 1.0,
+                    phosphate_mg_l=float(phosphate) if pd.notna(phosphate) else 0.5,
                     turbidity_ntu=10.0,
                     dissolved_oxygen_mg_l=6.0,
                     latitude=-25.7343,
