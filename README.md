@@ -11,13 +11,30 @@ This is the FastAPI backend for the Integrated Water Information System (IWIS), 
 
 ## Prerequisites
 * **Python 3.13+**
-* **PostgreSQL:** Running and accessible on port `5432`.
+* **PostgreSQL:** Installed and listening on the default port `5432`.
 * **PostGIS Extension:** (Optional, but recommended for advanced spatial features).
 
 ## Quick Start (New Users)
 
-**1. Database Setup**
-Ensure PostgreSQL is running and create the `iwis` database:
+**1. Start PostgreSQL Service**
+Ensure the PostgreSQL server is running on port `5432`:
+
+- **Windows (PowerShell):**
+  ```powershell
+  # Replace 'postgresql-x64-18' with your installed version
+  Start-Service postgresql*
+  ```
+- **macOS (Homebrew):**
+  ```bash
+  brew services start postgresql
+  ```
+- **Linux:**
+  ```bash
+  sudo systemctl start postgresql
+  ```
+
+**2. Database Setup**
+Create the `iwis` database:
 
 - **Windows (PowerShell):**
   ```powershell
@@ -32,7 +49,7 @@ Ensure PostgreSQL is running and create the `iwis` database:
   sudo -u postgres createdb iwis
   ```
 
-**2. Configure Environment**
+**3. Configure Environment**
 Copy the example environment file and update your credentials:
 
 - **macOS / Linux:**
@@ -49,7 +66,7 @@ Update `.env` with your database URL (using `127.0.0.1` is recommended):
 DATABASE_URL=postgresql+psycopg2://postgres:YOUR_PASSWORD@127.0.0.1:5432/iwis
 ```
 
-**3. Install Dependencies**
+**4. Install Dependencies**
 The project uses a shared virtual environment (`venv`) located in the root directory.
 
 - **macOS / Linux:**
@@ -63,7 +80,7 @@ The project uses a shared virtual environment (`venv`) located in the root direc
   .\venv\Scripts\pip install websockets
   ```
 
-**4. Start the FastAPI Server**
+**5. Start the FastAPI Server**
 From the `iwis-backend` directory:
 
 - **macOS / Linux:**
@@ -77,7 +94,7 @@ From the `iwis-backend` directory:
 
 The server will be available at `http://127.0.0.1:8000`.
 
-**5. Seed Historical Data (Optional)**
+**6. Seed Historical Data (Optional)**
 Populate the database with realistic trend data for testing:
 
 - **macOS / Linux:**
@@ -95,5 +112,5 @@ Once the server is running, you can explore the API using:
 - **ReDoc:** [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
 
 ## Troubleshooting
-- **Connection Refused (DB):** Ensure the `DATABASE_URL` matches your local PostgreSQL credentials and that the service is running.
+- **Connection Refused (DB):** Ensure the `DATABASE_URL` matches your local PostgreSQL credentials and that the service is running on port `5432`.
 - **WebSocket Error:** Ensure the `websockets` library is installed and you are connecting to `ws://127.0.0.1:8000/ws/live`.
