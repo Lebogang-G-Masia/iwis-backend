@@ -1,96 +1,60 @@
 # Integrated Water Information System (IWIS) - Backend
 
-This is the FastAPI backend for the Integrated Water Information System (IWIS), a digital monitoring and analytics platform designed to address ecological degradation at Hartbeespoort Dam. It handles data ingestion from environmental sensors, manages citizen-scientist reports, processes automated alerts, and performs real-time exploratory data analysis (EDA).
+This is the FastAPI backend for the Integrated Water Information System (IWIS), a digital monitoring and analytics platform designed to address ecological degradation at Hartbeespoort Dam.
 
 ## Features
 * **REST API:** Fast, asynchronous endpoints built with FastAPI.
-* **Spatial Database:** PostgreSQL integration with PostGIS for mapping sensor locations and citizen reports.
-* **Automated Alerting:** Database triggers automatically generate alerts when ecological thresholds (e.g., nitrates > 5.0 mg/L) are breached.
+* **Spatial Database:** PostgreSQL integration for mapping sensor locations and citizen reports.
+* **Automated Alerting:** Processes alerts when ecological thresholds (e.g., nitrates > 5.0 mg/L) are breached.
 * **Real-Time Analysis:** On-the-fly Pearson correlation matrices calculated using Pandas.
-* **Data Seeding:** Built-in Python script to populate the database with realistic, historical trend data.
+* **Live Updates:** WebSocket support for real-time sensor data and alerts.
 
 ## Prerequisites
-* Python 3.13 recommended (3.10+ supported)
-* PostgreSQL (with the PostGIS extension)
-* A terminal environment (Windows PowerShell, macOS Terminal, or Linux shell)
+* **Python 3.13+**
+* **PostgreSQL:** Running and accessible on port `5432`.
+* **PostGIS Extension:** (Optional, but recommended for advanced spatial features).
 
-## Installation & Setup
+## Quick Start (New Users)
 
-**1. Clone the repository**
+**1. Database Setup**
+Ensure PostgreSQL is running and create the `iwis` database:
 ```bash
-git clone git@github.com:username/iwis-backend.git
-cd iwis-backend
-```
-**2. Create and activate a virtual environment**
-```powershell
-# Windows (PowerShell)
-py -3.13 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-```
-```cmd
-# Windows (Command Prompt)
-py -3.13 -m venv .venv
-.venv\Scripts\activate.bat
-```
-```bash
-# macOS / Linux
-python -m venv .venv
-source .venv/bin/activate
-```
-**3. Install dependencies**
-```bash
-pip install -r requirements.txt
-pip install pandas psycopg2-binary requests
-```
-**4. Database setup**
-```powershell
-# Windows (Service name can be postgresql-x64-17, postgresql-x64-18, ...)
-Get-Service *postgres*
-Start-Service postgresql-x64-18
-
-# If createdb is in PATH
-createdb -h localhost -p 5432 -U postgres iwis
-```
-```bash
-# macOS (Homebrew)
-brew services start postgresql
-createdb -h localhost -p 5432 -U postgres iwis
-
-# macOS (EnterpriseDB installer)
-# 1) Add PostgreSQL bin folder to PATH in your current shell session:
-# export PATH="/Library/PostgreSQL/<version>/bin:$PATH"
-# 2) Then run:
-pg_isready -h localhost -p 5432
-createdb -h localhost -p 5432 -U postgres iwis
-```
-```bash
-# Linux (systemd)
-sudo systemctl start postgresql
+# Linux (example)
 sudo -u postgres createdb iwis
 ```
+
+**2. Configure Environment**
+Create a `.env` file in the `iwis-backend` directory:
+```env
+DATABASE_URL=postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/iwis
+```
+*Note: Using `127.0.0.1` is recommended over `localhost` for faster and more reliable connections.*
+
+**3. Install Dependencies**
+The project uses a shared virtual environment in the root directory. From the project root:
 ```bash
-# Optional check on any OS
-psql -h localhost -p 5432 -U postgres -d iwis -c "SELECT version();"
+./venv/bin/pip install -r iwis-backend/requirements.txt
+./venv/bin/pip install websockets
 ```
 
-## Running the application
-
-**1. Start the FastAPI server**
+**4. Start the FastAPI Server**
+From the `iwis-backend` directory:
 ```bash
-python -m uvicorn app.main:app --reload
+../venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
-> The server will run at `http://127.0.0.1:8000`. Database tables are created on the first successful connection.
+The server will be available at `http://127.0.0.1:8000`.
 
-**2. Seed the database**
-
-> Open a second terminal, and run the seeder script
+**5. Seed Historical Data (Optional)**
+Populate the database with realistic trend data for testing:
 ```bash
-python seed_data.py
+../venv/bin/python seed_data.py
 ```
 
 ## API Documentation
-Once the server is running, FastAPI automatically generates API documentation.
+Once the server is running, you can explore the API using:
+- **Swagger UI:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- **ReDoc:** [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
 
-- **Swagger UI:** `http://127.0.0.1:8000/docs`
-- **ReDoc:** `http://127.0.0.1:8000/redoc`
-
+## Troubleshooting
+- **Connection Refused (DB):** Ensure the `DATABASE_URL` matches your local PostgreSQL credentials and that the service is running.
+- **WebSocket Error:** Ensure the `websockets` library is installed and you are connecting to `ws://127.0.0.1:8000/ws/live`.
